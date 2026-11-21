@@ -1,0 +1,255 @@
+{
+  "case_version": 1,
+  "name": "barrier-generation-futures",
+  "description": "Two barriers at px-b with different generations. Barrier gen 2 closes generation 1; barrier gen 3 closes both 1 and 2. A generation-1 marker that is still in flight when the gen-2 barrier fires blocks it (barrier_unproven); the same marker arriving after generation 1 has been closed is dropped with closed_generation instead of being re-routed. That difference is the point: identical marker state has a different future depending on which barrier generation has already fired. The safe table waits out the slowest permitted link before checking generation 2, then checks generation 3 only after generation 2 has closed.",
+  "ttl": 6,
+  "horizon": 22,
+  "tenants": [
+    "t-alpha"
+  ],
+  "services": [
+    {
+      "id": "svc-orders",
+      "accepts": [
+        {
+          "tenant": "t-alpha",
+          "label": "L1"
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "id": "px-a",
+      "kind": "proxy",
+      "region": "r1"
+    },
+    {
+      "id": "px-b",
+      "kind": "proxy",
+      "region": "r2"
+    },
+    {
+      "id": "svc-node",
+      "kind": "service",
+      "region": "r2",
+      "service": "svc-orders"
+    }
+  ],
+  "links": [
+    {
+      "id": "a-b",
+      "from": "px-a",
+      "to": "px-b",
+      "delivery": 1,
+      "forward": 1,
+      "domain": "d-east"
+    },
+    {
+      "id": "b-s",
+      "from": "px-b",
+      "to": "svc-node",
+      "delivery": 0,
+      "forward": 1,
+      "domain": "d-east"
+    }
+  ],
+  "identities": [
+    {
+      "id": "id-alpha",
+      "tenant": "t-alpha",
+      "service": "svc-orders"
+    }
+  ],
+  "policy": {
+    "inbound": [
+      {
+        "id": "in-a-v1",
+        "version": "v1",
+        "proxy": "px-a",
+        "generation": 1,
+        "tenant": "t-alpha",
+        "service": "svc-orders",
+        "identity": "id-alpha",
+        "label": "L0"
+      },
+      {
+        "id": "in-b-v1",
+        "version": "v1",
+        "proxy": "px-b",
+        "generation": 1,
+        "tenant": "t-alpha",
+        "service": "svc-orders",
+        "identity": "id-alpha",
+        "label": "L1"
+      },
+      {
+        "id": "in-b-v2",
+        "version": "v2",
+        "proxy": "px-b",
+        "generation": 2,
+        "tenant": "t-alpha",
+        "service": "svc-orders",
+        "identity": "id-alpha",
+        "label": "L1"
+      },
+      {
+        "id": "in-b-v3",
+        "version": "v3",
+        "proxy": "px-b",
+        "generation": 3,
+        "tenant": "t-alpha",
+        "service": "svc-orders",
+        "identity": "id-alpha",
+        "label": "L1"
+      }
+    ],
+    "egress": [
+      {
+        "id": "eg-a-v1",
+        "version": "v1",
+        "proxy": "px-a",
+        "generation": 1,
+        "tenant": "t-alpha",
+        "service": "svc-orders",
+        "identity": "id-alpha",
+        "label_in": "L0",
+        "label_out": "L1",
+        "link": "a-b"
+      },
+      {
+        "id": "eg-b-v1",
+        "version": "v1",
+        "proxy": "px-b",
+        "generation": 1,
+        "tenant": "t-alpha",
+        "service": "svc-orders",
+        "identity": "id-alpha",
+        "label_in": "L1",
+        "label_out": "L1",
+        "link": "b-s"
+      },
+      {
+        "id": "eg-b-v2",
+        "version": "v2",
+        "proxy": "px-b",
+        "generation": 2,
+        "tenant": "t-alpha",
+        "service": "svc-orders",
+        "identity": "id-alpha",
+        "label_in": "L1",
+        "label_out": "L1",
+        "link": "b-s"
+      },
+      {
+        "id": "eg-b-v3",
+        "version": "v3",
+        "proxy": "px-b",
+        "generation": 3,
+        "tenant": "t-alpha",
+        "service": "svc-orders",
+        "identity": "id-alpha",
+        "label_in": "L1",
+        "label_out": "L1",
+        "link": "b-s"
+      }
+    ],
+    "initial": {
+      "px-a": {
+        "inbound": [
+          "v1"
+        ],
+        "egress": [
+          "v1"
+        ]
+      },
+      "px-b": {
+        "inbound": [
+          "v1",
+          "v2",
+          "v3"
+        ],
+        "egress": [
+          "v1",
+          "v2",
+          "v3"
+        ]
+      }
+    }
+  },
+  "requests": [
+    {
+      "id": "req-gen1",
+      "identity": "id-alpha",
+      "tenant": "t-alpha",
+      "service": "svc-orders",
+      "entry": "px-a",
+      "label": "L0",
+      "generation": 1,
+      "start": 0,
+      "deadline": 10,
+      "eligible": [
+        "svc-orders"
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "id": "bar-b-gen2",
+      "kind": "barrier",
+      "proxy": "px-b",
+      "generation": 2,
+      "wait_slots": [
+        2,
+        3,
+        4
+      ]
+    },
+    {
+      "id": "bar-b-gen3",
+      "kind": "barrier",
+      "proxy": "px-b",
+      "generation": 3,
+      "wait_slots": [
+        0,
+        1,
+        2
+      ],
+      "after": [
+        "bar-b-gen2"
+      ]
+    }
+  ],
+  "timeline": [
+    {
+      "id": "bar-b-gen2",
+      "step": 1
+    },
+    {
+      "id": "bar-b-gen3",
+      "step": 10
+    }
+  ],
+  "plan": {
+    "slots": 8
+  },
+  "scenarios": {
+    "latency": [
+      {
+        "id": "slow-east",
+        "links": {
+          "a-b": {
+            "delivery": 3
+          }
+        }
+      }
+    ]
+  },
+  "replay": {
+    "latency": "baseline"
+  },
+  "baseline_order": [
+    "bar-b-gen2",
+    "bar-b-gen3"
+  ]
+}

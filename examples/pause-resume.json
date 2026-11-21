@@ -1,0 +1,206 @@
+{
+  "case_version": 1,
+  "name": "pause-queues-and-expires",
+  "description": "While px-b is paused it accepts and forwards no new marker: an arriving marker is queued and can only wait or expire. req-expires-in-queue arrives at step 2, is queued, and its TTL runs out before resume at step 5, so it is dropped with the specific reason expired_while_paused -- the queue never turns an expiry into a late delivery. req-arrives-on-resume reaches px-b in the very step the resume takes effect and is forwarded normally. The plan minimises total paused-proxy steps first, so the pause is only as long as the drain requires.",
+  "ttl": 5,
+  "horizon": 22,
+  "tenants": [
+    "t-alpha"
+  ],
+  "services": [
+    {
+      "id": "svc-orders",
+      "accepts": [
+        {
+          "tenant": "t-alpha",
+          "label": "L1"
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "id": "px-a",
+      "kind": "proxy",
+      "region": "r1"
+    },
+    {
+      "id": "px-b",
+      "kind": "proxy",
+      "region": "r2"
+    },
+    {
+      "id": "svc-node",
+      "kind": "service",
+      "region": "r2",
+      "service": "svc-orders"
+    }
+  ],
+  "links": [
+    {
+      "id": "a-b",
+      "from": "px-a",
+      "to": "px-b",
+      "delivery": 1,
+      "forward": 1,
+      "domain": "d-east"
+    },
+    {
+      "id": "b-s",
+      "from": "px-b",
+      "to": "svc-node",
+      "delivery": 0,
+      "forward": 0,
+      "domain": "d-east"
+    }
+  ],
+  "identities": [
+    {
+      "id": "id-alpha",
+      "tenant": "t-alpha",
+      "service": "svc-orders"
+    }
+  ],
+  "policy": {
+    "inbound": [
+      {
+        "id": "in-a-v1",
+        "version": "v1",
+        "proxy": "px-a",
+        "generation": 1,
+        "tenant": "t-alpha",
+        "service": "svc-orders",
+        "identity": "id-alpha",
+        "label": "L0"
+      },
+      {
+        "id": "in-b-v1",
+        "version": "v1",
+        "proxy": "px-b",
+        "generation": 1,
+        "tenant": "t-alpha",
+        "service": "svc-orders",
+        "identity": "id-alpha",
+        "label": "L1"
+      }
+    ],
+    "egress": [
+      {
+        "id": "eg-a-v1",
+        "version": "v1",
+        "proxy": "px-a",
+        "generation": 1,
+        "tenant": "t-alpha",
+        "service": "svc-orders",
+        "identity": "id-alpha",
+        "label_in": "L0",
+        "label_out": "L1",
+        "link": "a-b"
+      },
+      {
+        "id": "eg-b-v1",
+        "version": "v1",
+        "proxy": "px-b",
+        "generation": 1,
+        "tenant": "t-alpha",
+        "service": "svc-orders",
+        "identity": "id-alpha",
+        "label_in": "L1",
+        "label_out": "L1",
+        "link": "b-s"
+      }
+    ],
+    "initial": {
+      "px-a": {
+        "inbound": [
+          "v1"
+        ],
+        "egress": [
+          "v1"
+        ]
+      },
+      "px-b": {
+        "inbound": [
+          "v1"
+        ],
+        "egress": [
+          "v1"
+        ]
+      }
+    }
+  },
+  "requests": [
+    {
+      "id": "req-expires-in-queue",
+      "identity": "id-alpha",
+      "tenant": "t-alpha",
+      "service": "svc-orders",
+      "entry": "px-a",
+      "label": "L0",
+      "generation": 1,
+      "start": 0,
+      "deadline": 14,
+      "eligible": [
+        "svc-orders"
+      ]
+    },
+    {
+      "id": "req-arrives-on-resume",
+      "identity": "id-alpha",
+      "tenant": "t-alpha",
+      "service": "svc-orders",
+      "entry": "px-a",
+      "label": "L0",
+      "generation": 1,
+      "start": 3,
+      "deadline": 14,
+      "eligible": [
+        "svc-orders"
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "id": "pause-b",
+      "kind": "pause",
+      "proxy": "px-b"
+    },
+    {
+      "id": "resume-b",
+      "kind": "resume",
+      "proxy": "px-b"
+    }
+  ],
+  "timeline": [
+    {
+      "id": "pause-b",
+      "step": 2
+    },
+    {
+      "id": "resume-b",
+      "step": 5
+    }
+  ],
+  "plan": {
+    "slots": 8
+  },
+  "scenarios": {
+    "latency": [
+      {
+        "id": "slow-east",
+        "links": {
+          "a-b": {
+            "delivery": 3
+          }
+        }
+      }
+    ]
+  },
+  "replay": {
+    "latency": "baseline"
+  },
+  "baseline_order": [
+    "pause-b",
+    "resume-b"
+  ]
+}

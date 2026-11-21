@@ -1,0 +1,293 @@
+{
+  "case_version": 1,
+  "name": "leak-window-between-versions",
+  "description": "Two finally-legal egress versions at px-b. v1 sends generation-1 markers to svc-orders, which accepts (t-alpha, L1). v2 sends generation-2 markers to svc-next with label L2, which accepts (t-alpha, L2); it also keeps a gen-1 compatibility rule so markers already in flight are not stranded, but that rule preserves label L1 while the link now points at svc-next. Switching before the drain therefore hands an in-flight gen-1 marker to svc-next as (t-alpha, L1) -- a pair svc-next does not accept, i.e. a tenant-isolation leak. Draining gen 1 with a barrier before the switch removes the window.",
+  "ttl": 6,
+  "horizon": 30,
+  "tenants": [
+    "t-alpha",
+    "t-beta"
+  ],
+  "services": [
+    {
+      "id": "svc-orders",
+      "accepts": [
+        {
+          "tenant": "t-alpha",
+          "label": "L1"
+        },
+        {
+          "tenant": "t-beta",
+          "label": "L1"
+        }
+      ]
+    },
+    {
+      "id": "svc-next",
+      "accepts": [
+        {
+          "tenant": "t-alpha",
+          "label": "L2"
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "id": "px-a",
+      "kind": "proxy",
+      "region": "r1"
+    },
+    {
+      "id": "px-b",
+      "kind": "proxy",
+      "region": "r2"
+    },
+    {
+      "id": "node-orders",
+      "kind": "service",
+      "region": "r2",
+      "service": "svc-orders"
+    },
+    {
+      "id": "node-next",
+      "kind": "service",
+      "region": "r3",
+      "service": "svc-next"
+    }
+  ],
+  "links": [
+    {
+      "id": "a-b",
+      "from": "px-a",
+      "to": "px-b",
+      "delivery": 2,
+      "forward": 0,
+      "domain": "d-east"
+    },
+    {
+      "id": "b-orders",
+      "from": "px-b",
+      "to": "node-orders",
+      "delivery": 0,
+      "forward": 0,
+      "domain": "d-east"
+    },
+    {
+      "id": "b-next",
+      "from": "px-b",
+      "to": "node-next",
+      "delivery": 0,
+      "forward": 0,
+      "domain": "d-east"
+    }
+  ],
+  "identities": [
+    {
+      "id": "id-alpha",
+      "tenant": "t-alpha",
+      "service": "svc-orders"
+    },
+    {
+      "id": "id-beta",
+      "tenant": "t-beta",
+      "service": "svc-orders"
+    }
+  ],
+  "policy": {
+    "inbound": [
+      {
+        "id": "in-a-v1",
+        "version": "v1",
+        "proxy": "px-a",
+        "generation": 1,
+        "tenant": "t-alpha",
+        "service": "svc-orders",
+        "identity": "id-alpha",
+        "label": "L0"
+      },
+      {
+        "id": "in-b-v1",
+        "version": "v1",
+        "proxy": "px-b",
+        "generation": 1,
+        "tenant": "t-alpha",
+        "service": "svc-orders",
+        "identity": "id-alpha",
+        "label": "L1"
+      },
+      {
+        "id": "in-b-v2-gen1",
+        "version": "v2",
+        "proxy": "px-b",
+        "generation": 1,
+        "tenant": "t-alpha",
+        "service": "svc-orders",
+        "identity": "id-alpha",
+        "label": "L1"
+      },
+      {
+        "id": "in-b-v2-gen2",
+        "version": "v2",
+        "proxy": "px-b",
+        "generation": 2,
+        "tenant": "t-alpha",
+        "service": "svc-orders",
+        "identity": "id-alpha",
+        "label": "L2"
+      }
+    ],
+    "egress": [
+      {
+        "id": "eg-a-v1",
+        "version": "v1",
+        "proxy": "px-a",
+        "generation": 1,
+        "tenant": "t-alpha",
+        "service": "svc-orders",
+        "identity": "id-alpha",
+        "label_in": "L0",
+        "label_out": "L1",
+        "link": "a-b"
+      },
+      {
+        "id": "eg-b-v1",
+        "version": "v1",
+        "proxy": "px-b",
+        "generation": 1,
+        "tenant": "t-alpha",
+        "service": "svc-orders",
+        "identity": "id-alpha",
+        "label_in": "L1",
+        "label_out": "L1",
+        "link": "b-orders",
+        "switch_group": "egress-b"
+      },
+      {
+        "id": "eg-b-v2-gen1",
+        "version": "v2",
+        "proxy": "px-b",
+        "generation": 1,
+        "tenant": "t-alpha",
+        "service": "svc-orders",
+        "identity": "id-alpha",
+        "label_in": "L1",
+        "label_out": "L1",
+        "link": "b-next",
+        "switch_group": "egress-b"
+      },
+      {
+        "id": "eg-b-v2-gen2",
+        "version": "v2",
+        "proxy": "px-b",
+        "generation": 2,
+        "tenant": "t-alpha",
+        "service": "svc-orders",
+        "identity": "id-alpha",
+        "label_in": "L2",
+        "label_out": "L2",
+        "link": "b-next",
+        "switch_group": "egress-b"
+      }
+    ],
+    "initial": {
+      "px-a": {
+        "inbound": [
+          "v1"
+        ],
+        "egress": [
+          "v1"
+        ]
+      },
+      "px-b": {
+        "inbound": [
+          "v1"
+        ],
+        "egress": [
+          "v1"
+        ]
+      }
+    }
+  },
+  "requests": [
+    {
+      "id": "req-old",
+      "identity": "id-alpha",
+      "tenant": "t-alpha",
+      "service": "svc-orders",
+      "entry": "px-a",
+      "label": "L0",
+      "generation": 1,
+      "start": 0,
+      "deadline": 12,
+      "eligible": [
+        "svc-orders"
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "id": "inst-b-v2",
+      "kind": "install_inbound",
+      "proxy": "px-b",
+      "version": "v2"
+    },
+    {
+      "id": "sw-b-v2",
+      "kind": "switch_egress",
+      "proxy": "px-b",
+      "version": "v2"
+    },
+    {
+      "id": "bar-b-gen2",
+      "kind": "barrier",
+      "proxy": "px-b",
+      "generation": 2,
+      "wait_slots": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    }
+  ],
+  "timeline": [
+    {
+      "id": "inst-b-v2",
+      "step": 0
+    },
+    {
+      "id": "sw-b-v2",
+      "step": 1
+    },
+    {
+      "id": "bar-b-gen2",
+      "step": 5
+    }
+  ],
+  "plan": {
+    "slots": 8
+  },
+  "scenarios": {
+    "latency": [
+      {
+        "id": "slow-east",
+        "links": {
+          "a-b": {
+            "delivery": 3
+          }
+        }
+      }
+    ]
+  },
+  "replay": {
+    "latency": "baseline"
+  },
+  "baseline_order": [
+    "inst-b-v2",
+    "sw-b-v2",
+    "bar-b-gen2"
+  ]
+}

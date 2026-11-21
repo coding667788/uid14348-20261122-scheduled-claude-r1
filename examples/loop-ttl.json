@@ -1,0 +1,241 @@
+{
+  "case_version": 1,
+  "name": "loop-ttl-and-branch-receipts",
+  "description": "The topology contains a real cycle: px-a forwards L0 onto a-b, px-b rewrites L1 to L3 and sends the marker back over b-a, and px-a accepts L3 and forwards it onto a-b again. A marker that enters the cycle loses TTL on every hop and is finally discarded by expiry, never delivered from the loop. The request is a fan-out with a retry: each injection produces one independent thread per egress link of px-a, and a retry produces a second copy of each thread. The direct branch delivers twice, so the second delivery is recorded as a duplicate for that branch with the kept receipt named and a reason; the looping branch only ever expires, so it never touches the direct branch's receipt. This is the guarantee that branches of one request cannot overwrite or mix receipts.",
+  "ttl": 6,
+  "horizon": 30,
+  "tenants": [
+    "t-alpha"
+  ],
+  "services": [
+    {
+      "id": "svc-orders",
+      "accepts": [
+        {
+          "tenant": "t-alpha",
+          "label": "L1"
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "id": "px-a",
+      "kind": "proxy",
+      "region": "r1"
+    },
+    {
+      "id": "px-b",
+      "kind": "proxy",
+      "region": "r2"
+    },
+    {
+      "id": "n-orders",
+      "kind": "service",
+      "region": "r1",
+      "service": "svc-orders"
+    }
+  ],
+  "links": [
+    {
+      "id": "a-s",
+      "from": "px-a",
+      "to": "n-orders",
+      "delivery": 1,
+      "forward": 0,
+      "domain": "d-fast"
+    },
+    {
+      "id": "a-b",
+      "from": "px-a",
+      "to": "px-b",
+      "delivery": 1,
+      "forward": 0,
+      "domain": "d-loop"
+    },
+    {
+      "id": "b-a",
+      "from": "px-b",
+      "to": "px-a",
+      "delivery": 1,
+      "forward": 0,
+      "domain": "d-loop"
+    }
+  ],
+  "identities": [
+    {
+      "id": "id-alpha",
+      "tenant": "t-alpha",
+      "service": "svc-orders"
+    }
+  ],
+  "policy": {
+    "inbound": [
+      {
+        "id": "in-a-v1",
+        "version": "v1",
+        "proxy": "px-a",
+        "generation": 1,
+        "tenant": "t-alpha",
+        "service": "svc-orders",
+        "identity": "id-alpha",
+        "label": "L0"
+      },
+      {
+        "id": "in-a-ret",
+        "version": "v1",
+        "proxy": "px-a",
+        "generation": 1,
+        "tenant": "t-alpha",
+        "service": "svc-orders",
+        "identity": "id-alpha",
+        "label": "L3"
+      },
+      {
+        "id": "in-b-v1",
+        "version": "v1",
+        "proxy": "px-b",
+        "generation": 1,
+        "tenant": "t-alpha",
+        "service": "svc-orders",
+        "identity": "id-alpha",
+        "label": "L1"
+      }
+    ],
+    "egress": [
+      {
+        "id": "eg-a-s",
+        "version": "v1",
+        "proxy": "px-a",
+        "generation": 1,
+        "tenant": "t-alpha",
+        "service": "svc-orders",
+        "identity": "id-alpha",
+        "label_in": "L0",
+        "label_out": "L1",
+        "link": "a-s"
+      },
+      {
+        "id": "eg-a-b",
+        "version": "v1",
+        "proxy": "px-a",
+        "generation": 1,
+        "tenant": "t-alpha",
+        "service": "svc-orders",
+        "identity": "id-alpha",
+        "label_in": "L0",
+        "label_out": "L1",
+        "link": "a-b"
+      },
+      {
+        "id": "eg-a-ret",
+        "version": "v1",
+        "proxy": "px-a",
+        "generation": 1,
+        "tenant": "t-alpha",
+        "service": "svc-orders",
+        "identity": "id-alpha",
+        "label_in": "L3",
+        "label_out": "L1",
+        "link": "a-b"
+      },
+      {
+        "id": "eg-b-a",
+        "version": "v1",
+        "proxy": "px-b",
+        "generation": 1,
+        "tenant": "t-alpha",
+        "service": "svc-orders",
+        "identity": "id-alpha",
+        "label_in": "L1",
+        "label_out": "L3",
+        "link": "b-a"
+      }
+    ],
+    "initial": {
+      "px-a": {
+        "inbound": [
+          "v1"
+        ],
+        "egress": [
+          "v1"
+        ]
+      },
+      "px-b": {
+        "inbound": [
+          "v1"
+        ],
+        "egress": [
+          "v1"
+        ]
+      }
+    }
+  },
+  "requests": [
+    {
+      "id": "req-fan",
+      "identity": "id-alpha",
+      "tenant": "t-alpha",
+      "service": "svc-orders",
+      "entry": "px-a",
+      "label": "L0",
+      "generation": 1,
+      "start": 0,
+      "deadline": 12,
+      "fanout": true,
+      "eligible": [
+        "svc-orders"
+      ],
+      "retries": [
+        6
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "id": "noop-pause",
+      "kind": "pause",
+      "proxy": "px-b"
+    },
+    {
+      "id": "noop-resume",
+      "kind": "resume",
+      "proxy": "px-b"
+    }
+  ],
+  "timeline": [
+    {
+      "id": "noop-pause",
+      "step": 0
+    },
+    {
+      "id": "noop-resume",
+      "step": 0
+    }
+  ],
+  "plan": {
+    "slots": 8
+  },
+  "scenarios": {
+    "latency": [
+      {
+        "id": "slow-loop",
+        "links": {
+          "a-b": {
+            "delivery": 3
+          },
+          "b-a": {
+            "delivery": 3
+          }
+        }
+      }
+    ]
+  },
+  "replay": {
+    "latency": "baseline"
+  },
+  "baseline_order": [
+    "noop-pause",
+    "noop-resume"
+  ]
+}

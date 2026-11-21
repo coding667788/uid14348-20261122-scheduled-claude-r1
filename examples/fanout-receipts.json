@@ -1,0 +1,220 @@
+{
+  "case_version": 1,
+  "name": "fanout-independent-receipts",
+  "description": "A fan-out request injects one independent thread per egress link of its entry proxy. Each branch has its own receipt slot, so a slow branch can never overwrite or mix with a fast one; require_all_branches asks for every branch and the two delays stay within TTL. The pause/resume pair in the timeline is a no-op on the entry proxy: it is placed before anything is in flight, which shows that an empty pause costs nothing and changes nothing.",
+  "ttl": 6,
+  "horizon": 30,
+  "tenants": [
+    "t-alpha"
+  ],
+  "services": [
+    {
+      "id": "svc-orders",
+      "accepts": [
+        {
+          "tenant": "t-alpha",
+          "label": "L1"
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "id": "px-a",
+      "kind": "proxy",
+      "region": "r1"
+    },
+    {
+      "id": "px-b",
+      "kind": "proxy",
+      "region": "r2"
+    },
+    {
+      "id": "node-orders",
+      "kind": "service",
+      "region": "r2",
+      "service": "svc-orders"
+    },
+    {
+      "id": "node-alt",
+      "kind": "service",
+      "region": "r2",
+      "service": "svc-orders"
+    }
+  ],
+  "links": [
+    {
+      "id": "a-b",
+      "from": "px-a",
+      "to": "px-b",
+      "delivery": 1,
+      "forward": 1,
+      "domain": "d-fast"
+    },
+    {
+      "id": "a-alt",
+      "from": "px-a",
+      "to": "node-alt",
+      "delivery": 4,
+      "forward": 1,
+      "domain": "d-slow"
+    },
+    {
+      "id": "b-orders",
+      "from": "px-b",
+      "to": "node-orders",
+      "delivery": 0,
+      "forward": 1,
+      "domain": "d-fast"
+    }
+  ],
+  "identities": [
+    {
+      "id": "id-alpha",
+      "tenant": "t-alpha",
+      "service": "svc-orders"
+    }
+  ],
+  "policy": {
+    "inbound": [
+      {
+        "id": "in-a-v1",
+        "version": "v1",
+        "proxy": "px-a",
+        "generation": 1,
+        "tenant": "t-alpha",
+        "service": "svc-orders",
+        "identity": "id-alpha",
+        "label": "L0"
+      },
+      {
+        "id": "in-b-v1",
+        "version": "v1",
+        "proxy": "px-b",
+        "generation": 1,
+        "tenant": "t-alpha",
+        "service": "svc-orders",
+        "identity": "id-alpha",
+        "label": "L1"
+      }
+    ],
+    "egress": [
+      {
+        "id": "eg-a-b",
+        "version": "v1",
+        "proxy": "px-a",
+        "generation": 1,
+        "tenant": "t-alpha",
+        "service": "svc-orders",
+        "identity": "id-alpha",
+        "label_in": "L0",
+        "label_out": "L1",
+        "link": "a-b"
+      },
+      {
+        "id": "eg-a-alt",
+        "version": "v1",
+        "proxy": "px-a",
+        "generation": 1,
+        "tenant": "t-alpha",
+        "service": "svc-orders",
+        "identity": "id-alpha",
+        "label_in": "L0",
+        "label_out": "L1",
+        "link": "a-alt"
+      },
+      {
+        "id": "eg-b-v1",
+        "version": "v1",
+        "proxy": "px-b",
+        "generation": 1,
+        "tenant": "t-alpha",
+        "service": "svc-orders",
+        "identity": "id-alpha",
+        "label_in": "L1",
+        "label_out": "L1",
+        "link": "b-orders"
+      }
+    ],
+    "initial": {
+      "px-a": {
+        "inbound": [
+          "v1"
+        ],
+        "egress": [
+          "v1"
+        ]
+      },
+      "px-b": {
+        "inbound": [
+          "v1"
+        ],
+        "egress": [
+          "v1"
+        ]
+      }
+    }
+  },
+  "requests": [
+    {
+      "id": "req-fan",
+      "identity": "id-alpha",
+      "tenant": "t-alpha",
+      "service": "svc-orders",
+      "entry": "px-a",
+      "label": "L0",
+      "generation": 1,
+      "start": 0,
+      "deadline": 8,
+      "fanout": true,
+      "require_all_branches": true,
+      "eligible": [
+        "svc-orders"
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "id": "pause-a",
+      "kind": "pause",
+      "proxy": "px-a"
+    },
+    {
+      "id": "resume-a",
+      "kind": "resume",
+      "proxy": "px-a"
+    }
+  ],
+  "timeline": [
+    {
+      "id": "pause-a",
+      "step": 0
+    },
+    {
+      "id": "resume-a",
+      "step": 0
+    }
+  ],
+  "plan": {
+    "slots": 8
+  },
+  "scenarios": {
+    "latency": [
+      {
+        "id": "slow-alt",
+        "links": {
+          "a-alt": {
+            "delivery": 4
+          }
+        }
+      }
+    ]
+  },
+  "replay": {
+    "latency": "baseline"
+  },
+  "baseline_order": [
+    "pause-a",
+    "resume-a"
+  ]
+}

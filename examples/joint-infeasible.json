@@ -1,0 +1,329 @@
+{
+  "case_version": 1,
+  "name": "joint-infeasibility-two-scenarios",
+  "description": "A single egress switch at px-b must separate two requests that share identity, service and label. Only timing can separate them, because req-old is only eligible for svc-old and req-new only for svc-new, and each version of the switch serves exactly one of those services on px-b; both versions keep each request's own label, so the service that finally receives a request decides eligibility. In the baseline scenario req-old leaves px-b at step 0 and req-new arrives at step 3, so the switch slot must be in {1, 2}. In inverted-reach the two entry delays are swapped, so the switch would have to be both after step 3 and before step 0. Each scenario therefore has a legal table of its own (baseline at 1 or 2, inverted at 2), but the intersection is empty. plan reports E_UNSATISFIABLE. The baseline order has no pairwise scheduling conflict, so the report gives the shortest reachability failure prefix instead.",
+  "ttl": 6,
+  "horizon": 20,
+  "tenants": [
+    "t-alpha"
+  ],
+  "services": [
+    {
+      "id": "svc-shared",
+      "accepts": [
+        {
+          "tenant": "t-alpha",
+          "label": "L1"
+        }
+      ]
+    },
+    {
+      "id": "svc-old",
+      "accepts": [
+        {
+          "tenant": "t-alpha",
+          "label": "L1"
+        }
+      ]
+    },
+    {
+      "id": "svc-new",
+      "accepts": [
+        {
+          "tenant": "t-alpha",
+          "label": "L1"
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "id": "px-a",
+      "kind": "proxy",
+      "region": "r1"
+    },
+    {
+      "id": "px-c",
+      "kind": "proxy",
+      "region": "r3"
+    },
+    {
+      "id": "px-b",
+      "kind": "proxy",
+      "region": "r2"
+    },
+    {
+      "id": "n-new",
+      "kind": "service",
+      "region": "r2",
+      "service": "svc-new"
+    },
+    {
+      "id": "n-old",
+      "kind": "service",
+      "region": "r2",
+      "service": "svc-old"
+    }
+  ],
+  "links": [
+    {
+      "id": "a-b",
+      "from": "px-a",
+      "to": "px-b",
+      "delivery": 0,
+      "forward": 0,
+      "domain": "d-west"
+    },
+    {
+      "id": "c-b",
+      "from": "px-c",
+      "to": "px-b",
+      "delivery": 3,
+      "forward": 0,
+      "domain": "d-east"
+    },
+    {
+      "id": "b-old",
+      "from": "px-b",
+      "to": "n-old",
+      "delivery": 0,
+      "forward": 0,
+      "domain": "d-old"
+    },
+    {
+      "id": "b-new",
+      "from": "px-b",
+      "to": "n-new",
+      "delivery": 0,
+      "forward": 0,
+      "domain": "d-new"
+    }
+  ],
+  "identities": [
+    {
+      "id": "id-alpha",
+      "tenant": "t-alpha",
+      "service": "svc-shared"
+    }
+  ],
+  "policy": {
+    "inbound": [
+      {
+        "id": "in-a-v1",
+        "version": "v1",
+        "proxy": "px-a",
+        "generation": 0,
+        "tenant": "t-alpha",
+        "service": "svc-shared",
+        "identity": "id-alpha",
+        "label": "L0"
+      },
+      {
+        "id": "in-c-v1",
+        "version": "v1",
+        "proxy": "px-c",
+        "generation": 0,
+        "tenant": "t-alpha",
+        "service": "svc-shared",
+        "identity": "id-alpha",
+        "label": "L0"
+      },
+      {
+        "id": "in-b-v1",
+        "version": "v1",
+        "proxy": "px-b",
+        "generation": 0,
+        "tenant": "t-alpha",
+        "service": "svc-shared",
+        "identity": "id-alpha",
+        "label": "L1"
+      }
+    ],
+    "egress": [
+      {
+        "id": "eg-a-v1",
+        "version": "v1",
+        "proxy": "px-a",
+        "generation": 0,
+        "tenant": "t-alpha",
+        "service": "svc-shared",
+        "identity": "id-alpha",
+        "label_in": "L0",
+        "label_out": "L1",
+        "link": "a-b"
+      },
+      {
+        "id": "eg-c-v1",
+        "version": "v1",
+        "proxy": "px-c",
+        "generation": 0,
+        "tenant": "t-alpha",
+        "service": "svc-shared",
+        "identity": "id-alpha",
+        "label_in": "L0",
+        "label_out": "L1",
+        "link": "c-b"
+      },
+      {
+        "id": "eg-b-v1",
+        "version": "v1",
+        "proxy": "px-b",
+        "generation": 0,
+        "tenant": "t-alpha",
+        "service": "svc-shared",
+        "identity": "id-alpha",
+        "label_in": "L1",
+        "label_out": "L1",
+        "link": "b-old",
+        "switch_group": "eg-b"
+      },
+      {
+        "id": "eg-b-v2",
+        "version": "v2",
+        "proxy": "px-b",
+        "generation": 0,
+        "tenant": "t-alpha",
+        "service": "svc-shared",
+        "identity": "id-alpha",
+        "label_in": "L1",
+        "label_out": "L1",
+        "link": "b-new",
+        "switch_group": "eg-b"
+      },
+      {
+        "id": "eg-b-v2-old",
+        "version": "v2",
+        "proxy": "px-b",
+        "generation": 0,
+        "tenant": "t-alpha",
+        "service": "svc-shared",
+        "identity": "id-alpha",
+        "label_in": "L1",
+        "label_out": "L1",
+        "link": "b-old",
+        "switch_group": "eg-b"
+      },
+      {
+        "id": "eg-b-v1-new",
+        "version": "v1",
+        "proxy": "px-b",
+        "generation": 0,
+        "tenant": "t-alpha",
+        "service": "svc-shared",
+        "identity": "id-alpha",
+        "label_in": "L1",
+        "label_out": "L1",
+        "link": "b-new",
+        "switch_group": "eg-b"
+      }
+    ],
+    "initial": {
+      "px-a": {
+        "inbound": [
+          "v1"
+        ],
+        "egress": [
+          "v1"
+        ]
+      },
+      "px-c": {
+        "inbound": [
+          "v1"
+        ],
+        "egress": [
+          "v1"
+        ]
+      },
+      "px-b": {
+        "inbound": [
+          "v1"
+        ],
+        "egress": [
+          "v1"
+        ]
+      }
+    }
+  },
+  "requests": [
+    {
+      "id": "req-old",
+      "identity": "id-alpha",
+      "tenant": "t-alpha",
+      "service": "svc-shared",
+      "entry": "px-a",
+      "label": "L0",
+      "generation": 0,
+      "start": 0,
+      "deadline": 14,
+      "eligible": [
+        "svc-old"
+      ]
+    },
+    {
+      "id": "req-new",
+      "identity": "id-alpha",
+      "tenant": "t-alpha",
+      "service": "svc-shared",
+      "entry": "px-c",
+      "label": "L0",
+      "generation": 0,
+      "start": 0,
+      "deadline": 14,
+      "eligible": [
+        "svc-new"
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "id": "sw-b-v2",
+      "kind": "switch_egress",
+      "proxy": "px-b",
+      "version": "v2"
+    }
+  ],
+  "timeline": [
+    {
+      "id": "sw-b-v2",
+      "step": 5
+    }
+  ],
+  "plan": {
+    "slots": 10
+  },
+  "scenarios": {
+    "latency": [
+      {
+        "id": "inverted-reach",
+        "links": {
+          "a-b": {
+            "delivery": 3
+          },
+          "c-b": {
+            "delivery": 0
+          },
+          "b-old": {
+            "delivery": 3
+          }
+        }
+      },
+      {
+        "id": "inverted-old",
+        "links": {
+          "a-b": {
+            "delivery": 6
+          },
+          "c-b": {
+            "delivery": 0
+          }
+        }
+      }
+    ]
+  },
+  "replay": {
+    "latency": "baseline"
+  },
+  "baseline_order": [
+    "sw-b-v2"
+  ]
+}

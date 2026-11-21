@@ -1,0 +1,85 @@
+{
+  "case_version": 1,
+  "name": "fault-window-ends-at-ttl",
+  "description": "The d-east outage opens at step 3 and ends at step 7; after recovery every hop on that domain is stretched by one step. req-in-outage is injected at step 0 and its hop lands exactly at step 3, the first step of the outage: it is discarded with reason fault_dropped and its TTL keeps counting down, and the later recovery does not bring it back. req-after-recovery is injected at step 7, the recovery step, and its stretched hop lands at step 11 while its TTL ran out at step 10: the drop reason is ttl_expired, never a recovery success. Because a request's start step is fixed by the input and not by the table, no fixed release table can rescue either request, so plan reports E_UNSATISFIABLE with the earliest baseline failure prefix. This is the intended demonstration that a fault window ending at a TTL boundary is not a rescue.",
+  "ttl": 4,
+  "horizon": 24,
+  "tenants": ["t-alpha"],
+  "services": [
+    {"id": "svc-orders", "accepts": [{"tenant": "t-alpha", "label": "L1"}]}
+  ],
+  "nodes": [
+    {"id": "px-a", "kind": "proxy", "region": "r1"},
+    {"id": "px-b", "kind": "proxy", "region": "r2"},
+    {"id": "svc-node", "kind": "service", "region": "r2", "service": "svc-orders"}
+  ],
+  "links": [
+    {"id": "a-b", "from": "px-a", "to": "px-b", "delivery": 3, "forward": 0, "domain": "d-east"},
+    {"id": "b-s", "from": "px-b", "to": "svc-node", "delivery": 0, "forward": 1, "domain": "d-east"}
+  ],
+  "identities": [
+    {"id": "id-alpha", "tenant": "t-alpha", "service": "svc-orders"}
+  ],
+  "policy": {
+    "inbound": [
+      {"id": "in-a-v1", "version": "v1", "proxy": "px-a", "generation": 1, "tenant": "t-alpha", "service": "svc-orders", "identity": "id-alpha", "label": "L0"},
+      {"id": "in-b-v1", "version": "v1", "proxy": "px-b", "generation": 1, "tenant": "t-alpha", "service": "svc-orders", "identity": "id-alpha", "label": "L1"}
+    ],
+    "egress": [
+      {"id": "eg-a-v1", "version": "v1", "proxy": "px-a", "generation": 1, "tenant": "t-alpha", "service": "svc-orders", "identity": "id-alpha", "label_in": "L0", "label_out": "L1", "link": "a-b"},
+      {"id": "eg-b-v1", "version": "v1", "proxy": "px-b", "generation": 1, "tenant": "t-alpha", "service": "svc-orders", "identity": "id-alpha", "label_in": "L1", "label_out": "L1", "link": "b-s"}
+    ],
+    "initial": {
+      "px-a": {"inbound": ["v1"], "egress": ["v1"]},
+      "px-b": {"inbound": ["v1"], "egress": ["v1"]}
+    }
+  },
+  "requests": [
+    {
+      "id": "req-in-outage",
+      "identity": "id-alpha",
+      "tenant": "t-alpha",
+      "service": "svc-orders",
+      "entry": "px-a",
+      "label": "L0",
+      "generation": 1,
+      "start": 0,
+      "deadline": 12,
+      "eligible": ["svc-orders"]
+    },
+    {
+      "id": "req-after-recovery",
+      "identity": "id-alpha",
+      "tenant": "t-alpha",
+      "service": "svc-orders",
+      "entry": "px-a",
+      "label": "L0",
+      "generation": 1,
+      "start": 7,
+      "deadline": 20,
+      "eligible": ["svc-orders"]
+    }
+  ],
+  "actions": [
+    {"id": "install-b-v1", "kind": "install_inbound", "proxy": "px-b", "version": "v1"},
+    {"id": "bar-b-gen1", "kind": "barrier", "proxy": "px-b", "generation": 1, "wait_slots": [0, 1, 2, 3]}
+  ],
+  "timeline": [
+    {"id": "install-b-v1", "step": 1},
+    {"id": "bar-b-gen1", "step": 2}
+  ],
+  "plan": {"slots": 8},
+  "scenarios": {
+    "latency": [
+      {"id": "slow-east", "links": {"a-b": {"delivery": 4}}}
+    ],
+    "fault": {
+      "domain": "d-east",
+      "fail_at": 3,
+      "recover_at": 7,
+      "recover_stretch": 1
+    }
+  },
+  "replay": {"latency": "baseline", "fault": true},
+  "baseline_order": ["install-b-v1", "bar-b-gen1"]
+}

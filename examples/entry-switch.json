@@ -1,0 +1,315 @@
+{
+  "case_version": 1,
+  "name": "entry-switch-stales-old-markers",
+  "description": "A tenant's entry proxy moves from px-a to px-c. A generation-1 marker injected at px-a is still in flight on the slower d-old link when px-b is asked to drain generation 1. In the replay timeline the barrier is checked at step 1, before that marker lands: it refuses (barrier_unproven) and the two retires are rejected (retire_without_drain). A plan can only succeed by letting the barrier wait until the slowest permitted link has cleared; the planner finds such a table. The marker's future therefore depends on which barrier generation has already fired, even though the marker state itself is unchanged.",
+  "ttl": 6,
+  "horizon": 26,
+  "tenants": [
+    "t-alpha"
+  ],
+  "services": [
+    {
+      "id": "svc-orders",
+      "accepts": [
+        {
+          "tenant": "t-alpha",
+          "label": "L1"
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "id": "px-a",
+      "kind": "proxy",
+      "region": "r1"
+    },
+    {
+      "id": "px-b",
+      "kind": "proxy",
+      "region": "r2"
+    },
+    {
+      "id": "px-c",
+      "kind": "proxy",
+      "region": "r3"
+    },
+    {
+      "id": "svc-node",
+      "kind": "service",
+      "region": "r2",
+      "service": "svc-orders"
+    }
+  ],
+  "links": [
+    {
+      "id": "a-b",
+      "from": "px-a",
+      "to": "px-b",
+      "delivery": 2,
+      "forward": 0,
+      "domain": "d-old"
+    },
+    {
+      "id": "c-b",
+      "from": "px-c",
+      "to": "px-b",
+      "delivery": 1,
+      "forward": 0,
+      "domain": "d-new"
+    },
+    {
+      "id": "b-s",
+      "from": "px-b",
+      "to": "svc-node",
+      "delivery": 0,
+      "forward": 0,
+      "domain": "d-new"
+    }
+  ],
+  "identities": [
+    {
+      "id": "id-alpha",
+      "tenant": "t-alpha",
+      "service": "svc-orders"
+    }
+  ],
+  "policy": {
+    "inbound": [
+      {
+        "id": "in-a-v1",
+        "version": "v1",
+        "proxy": "px-a",
+        "generation": 1,
+        "tenant": "t-alpha",
+        "service": "svc-orders",
+        "identity": "id-alpha",
+        "label": "L0"
+      },
+      {
+        "id": "in-c-v2",
+        "version": "v2",
+        "proxy": "px-c",
+        "generation": 2,
+        "tenant": "t-alpha",
+        "service": "svc-orders",
+        "identity": "id-alpha",
+        "label": "L0"
+      },
+      {
+        "id": "in-b-v1",
+        "version": "v1",
+        "proxy": "px-b",
+        "generation": 1,
+        "tenant": "t-alpha",
+        "service": "svc-orders",
+        "identity": "id-alpha",
+        "label": "L1"
+      },
+      {
+        "id": "in-b-v2",
+        "version": "v2",
+        "proxy": "px-b",
+        "generation": 2,
+        "tenant": "t-alpha",
+        "service": "svc-orders",
+        "identity": "id-alpha",
+        "label": "L1"
+      }
+    ],
+    "egress": [
+      {
+        "id": "eg-a-v1",
+        "version": "v1",
+        "proxy": "px-a",
+        "generation": 1,
+        "tenant": "t-alpha",
+        "service": "svc-orders",
+        "identity": "id-alpha",
+        "label_in": "L0",
+        "label_out": "L1",
+        "link": "a-b"
+      },
+      {
+        "id": "eg-c-v2",
+        "version": "v2",
+        "proxy": "px-c",
+        "generation": 2,
+        "tenant": "t-alpha",
+        "service": "svc-orders",
+        "identity": "id-alpha",
+        "label_in": "L0",
+        "label_out": "L1",
+        "link": "c-b"
+      },
+      {
+        "id": "eg-b-v1",
+        "version": "v1",
+        "proxy": "px-b",
+        "generation": 1,
+        "tenant": "t-alpha",
+        "service": "svc-orders",
+        "identity": "id-alpha",
+        "label_in": "L1",
+        "label_out": "L1",
+        "link": "b-s"
+      },
+      {
+        "id": "eg-b-v2",
+        "version": "v2",
+        "proxy": "px-b",
+        "generation": 2,
+        "tenant": "t-alpha",
+        "service": "svc-orders",
+        "identity": "id-alpha",
+        "label_in": "L1",
+        "label_out": "L1",
+        "link": "b-s"
+      }
+    ],
+    "initial": {
+      "px-a": {
+        "inbound": [
+          "v1"
+        ],
+        "egress": [
+          "v1"
+        ]
+      },
+      "px-b": {
+        "inbound": [
+          "v1",
+          "v2"
+        ],
+        "egress": [
+          "v1",
+          "v2"
+        ]
+      },
+      "px-c": {
+        "inbound": [
+          "v2"
+        ],
+        "egress": [
+          "v2"
+        ]
+      }
+    }
+  },
+  "requests": [
+    {
+      "id": "req-old-entry",
+      "identity": "id-alpha",
+      "tenant": "t-alpha",
+      "service": "svc-orders",
+      "entry": "px-a",
+      "label": "L0",
+      "generation": 1,
+      "start": 0,
+      "deadline": 12,
+      "eligible": [
+        "svc-orders"
+      ]
+    },
+    {
+      "id": "req-new-entry",
+      "identity": "id-alpha",
+      "tenant": "t-alpha",
+      "service": "svc-orders",
+      "entry": "px-c",
+      "label": "L0",
+      "generation": 2,
+      "start": 1,
+      "deadline": 12,
+      "eligible": [
+        "svc-orders"
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "id": "inst-b-v2",
+      "kind": "install_inbound",
+      "proxy": "px-b",
+      "version": "v2"
+    },
+    {
+      "id": "bar-b-gen2",
+      "kind": "barrier",
+      "proxy": "px-b",
+      "generation": 2,
+      "wait_slots": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ]
+    },
+    {
+      "id": "ret-in-b-v1",
+      "kind": "retire_inbound",
+      "proxy": "px-b",
+      "version": "v1",
+      "generation": 1
+    },
+    {
+      "id": "ret-eg-b-v1",
+      "kind": "retire_egress",
+      "proxy": "px-b",
+      "version": "v1",
+      "generation": 1
+    }
+  ],
+  "timeline": [
+    {
+      "id": "inst-b-v2",
+      "step": 0
+    },
+    {
+      "id": "bar-b-gen2",
+      "step": 1
+    },
+    {
+      "id": "ret-in-b-v1",
+      "step": 8
+    },
+    {
+      "id": "ret-eg-b-v1",
+      "step": 8
+    }
+  ],
+  "plan": {
+    "slots": 10
+  },
+  "scenarios": {
+    "latency": [
+      {
+        "id": "slow-old",
+        "links": {
+          "a-b": {
+            "delivery": 5
+          }
+        }
+      }
+    ],
+    "fault": {
+      "domain": "d-old",
+      "fail_at": 20,
+      "recover_at": 22,
+      "recover_stretch": 1
+    }
+  },
+  "replay": {
+    "latency": "baseline",
+    "fault": false
+  },
+  "baseline_order": [
+    "inst-b-v2",
+    "bar-b-gen2",
+    "ret-in-b-v1",
+    "ret-eg-b-v1"
+  ]
+}
